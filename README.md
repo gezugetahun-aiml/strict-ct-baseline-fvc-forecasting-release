@@ -1,6 +1,8 @@
 # Strict CT-Baseline Multimodal FVC Forecasting — Reproducibility Release
 
-**Archived release DOI:** https://doi.org/10.5281/zenodo.23911990
+**Archived v1.0.0 DOI:** https://doi.org/10.5281/zenodo.23911990
+
+The current `main` branch includes the Reviewer-2 outer-fold sensitivity analysis prepared for **v1.1.0**.
 
 This repository is the **sanitized public reproducibility release** for the manuscript *Strict CT-Baseline Multimodal Learning for Future FVC Prediction in Pulmonary Fibrosis*.
 
@@ -23,7 +25,7 @@ The `PF###` labels are one-time study-specific anonymous release labels. They ar
 - executable code implementing the deterministic patient-balanced five-fold construction used in the manuscript;
 - an anonymous cohort-structure manifest containing release label, fold, and number of future targets only;
 - aggregate fold summaries and aggregate manuscript/reviewer results;
-- scripts that authorized OSIC users can run locally to reconstruct the exact source-ID strict cohort, exclusions, future targets, outer folds, OOF metrics, reviewer oracle analysis, catastrophic-error table, and clinical-temporal Ridge baseline.
+- scripts that authorized OSIC users can run locally to reconstruct the exact source-ID strict cohort, exclusions, future targets, outer folds, OOF metrics, reviewer oracle analysis, catastrophic-error table, clinical-temporal Ridge baseline, and the Reviewer-2 baseline-only outer-fold sensitivity analysis.
 
 ## Reproducibility workflow
 
@@ -59,6 +61,19 @@ Reviewer-requested diagnostics:
 - retrospective oracle-best-expert MAE/RMSE: **99.029 / 182.002 mL**
 - catastrophic targets outside the seven-expert prediction range: **14/14**
 - catastrophic cases remaining >=500 mL under retrospective oracle selection: **10/14**
+
+## Reviewer 2 outer-fold sensitivity
+
+A post-hoc sensitivity analysis changes **only the outer patient partition** so that fold assignment uses prediction-origin variables rather than future-derived progression descriptors. Assignment uses Age, Sex, SmokingStatus, baseline FVC, Percent, baseline week, CT-derived FSS, and patient-count balancing. PatientSlope, rapid-decliner status, future-target count, future horizon, future FVC, and held-out prediction error are excluded from outer-fold assignment.
+
+On the same 29 patients and 231 targets, the baseline-only outer-fold sensitivity achieved:
+
+- MAE: **198.402 mL** versus 169.416 mL in the submitted partition; paired ΔMAE **+28.986 mL** (95% patient-cluster bootstrap CI 1.306 to 57.002).
+- RMSE: **267.997 mL** versus 243.886 mL; paired ΔRMSE **+24.111 mL** (95% CI -3.619 to 50.666).
+- modified LLL: **-7.053661** versus -6.954222; paired ΔLLL **-0.099438** (95% CI -0.321323 to 0.133370).
+- absolute errors >=500 mL: **18** versus 14.
+
+This analysis is reported as a reviewer-requested sensitivity analysis, not a replacement primary analysis. It indicates that outer-fold composition materially affects estimated MAE in the small strict cohort. See `docs/reviewer2_comment2_outerfold_sensitivity.md`.
 
 ## Recomputing prediction metrics
 
