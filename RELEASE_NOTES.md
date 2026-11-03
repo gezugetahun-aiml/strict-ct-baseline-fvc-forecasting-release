@@ -1,5 +1,7 @@
 # v1.1.0 release notes
 
+Version-specific DOI: https://doi.org/10.5281/zenodo.23926713
+
 This release extends the sanitized reproducibility package for the manuscript *Strict CT-Baseline Multimodal Learning for Future FVC Prediction in Pulmonary Fibrosis* with reviewer-requested sensitivity analyses.
 
 ## New in v1.1.0
