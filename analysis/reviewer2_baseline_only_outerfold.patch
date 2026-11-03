@@ -1,0 +1,439 @@
+--- FVC_Pred_FinalStable_v10.py
++++ FVC_Pred_FinalStable_v10_R2_BaselineOnlyOuterFolds.py
+@@ -1,44 +1,45 @@
+ # =============================================================================
+-# OSIC FVC PROGRESSION - FINAL STABLE v10 (FROZEN v9 PREDICTOR + ROBUST EVALUATION)
++# OSIC FVC PROGRESSION - v10 REVIEWER-2 SENSITIVITY VARIANT
++# BASELINE-ONLY OUTER FOLDS; FROZEN v10 MODEL OTHERWISE UNCHANGED
+ # =============================================================================
+-# Design principle:
+-#   Start from the best observed 10-fold ablation configuration:
+-#       Direct Delta-FVC + lower-lung focus + FSS + trainable attention
+-#   and ADD robust experts/calibration without perturbing the mean predictor.
++# PURPOSE
++# -------
++# Sensitivity analysis for Reviewer 2, Comment 2. The submitted/frozen v10
++# outer folds were balanced partly using future-derived quantities (forward FVC
++# slope, rapid-decliner status, target count, and forecast-horizon summaries).
++# This variant changes ONLY OUTER-FOLD CONSTRUCTION.
+ #
+-# Key differences from the failed SOTA-targeted rewrite:
+-#   - DenseNet169 only (the empirically strong backbone in this project)
+-#   - Lower-lung feature bank is the primary neural expert
+-#   - Direct Delta-FVC is the primary target
+-#   - Huber-only training for the mean neural predictor
+-#   - NO joint Laplace/quantile/sigma loss on the shared FVC representation
+-#   - NO patient-balanced sampler for a row-weighted target metric
+-#   - NO multi-backbone 2945-D slice vectors
+-#   - NO multi-window 3-channel reinterpretation of ImageNet channels
+-#   - Optional whole-relevant-lung expert for diversity, not as a replacement
+-#   - Independent patient-slope neural expert (SOTA-inspired)
+-#   - Ridge + GradientBoosting + ExtraTrees clinical experts
+-#   - Inner-validation convex blending; outer fold remains untouched
+-#   - Mean prediction and uncertainty calibration are fully decoupled
+-#   - Uncertainty candidates include constant sigma, a paper-inspired
+-#     Percent/slope confidence, and a ridge residual model; best is selected
+-#     on INNER validation only.
+-#   - Automated lung-bearing slice-range detection approximates the paper's
+-#     manual removal of irrelevant superior/inferior slices.
+-#   - Reports strict future-visit OOF metrics and a separate patient-trajectory
+-#     metric that includes the known baseline observation (closer to the
+-#     published paper/repository evaluation convention).
++# OUTER FOLD ASSIGNMENT USES ONLY INFORMATION AVAILABLE AT THE PREDICTION
++# ORIGIN:
++#   - Age
++#   - Sex
++#   - SmokingStatus
++#   - baseline FVC
++#   - Percent-predicted FVC at the baseline anchor
++#   - baseline week relative to CT (<= 0 under the strict protocol)
++#   - CT-derived FSS density proxy from the baseline CT
+ #
+-# FINAL-STABLE PRINCIPLE:
+-#   The v9 mean predictor, balanced patient folds, strict CT-baseline protocol,
+-#   rapid-decline loss, and stabilized uncertainty calibration are FROZEN.
+-#   v10 changes evaluation/reporting only:
+-#       IMPORTANT (enabled): patient-cluster bootstrap CIs + per-patient metrics
+-#       OPTIONAL (disabled): repeated balanced 5-fold CV
+-#       OPTIONAL (disabled): leave-one-patient-out CV
++# EXPLICITLY EXCLUDED FROM OUTER-FOLD ASSIGNMENT:
++#   - PatientSlope / forward FVC slope
++#   - RapidDecliner status
++#   - number of future targets
++#   - mean/max future forecast horizon
++#   - any future FVC value, future Delta-FVC, held-out error, or OOF metric
+ #
+-# This avoids tuning the neural architecture further to a 29-patient strict
+-# cohort while making the reported uncertainty and robustness more publishable.
++# EVERYTHING ELSE REMAINS AS IN FROZEN v10:
++#   - strict CT-baseline eligibility rule
++#   - CT preprocessing and DenseNet169 representations
++#   - lower-lung ratio and whole-lung expert
++#   - direct, slope, tabular, and persistence experts
++#   - training losses, seeds, epochs, and optimizers
++#   - INNER development split logic and all model-selection procedures
++#   - convex expert fusion and uncertainty calibration
++#   - patient-cluster bootstrap evaluation
++#
++# Keeping the inner development procedure unchanged is deliberate: this isolates
++# the reviewer's concern about outcome-informed OUTER validation partitioning.
++# Outcome-derived quantities inside outer-training data remain legitimate
++# development information and never enter the outer-validation predictor.
+ # =============================================================================
+ 
+ import os
+@@ -212,9 +213,25 @@
+ 
+ 
+     # -----------------------------------------------------------------
++    # v10 REVIEWER-2 OUTER-FOLD SENSITIVITY
++    # -----------------------------------------------------------------
++    # This sensitivity variant changes ONLY the outer patient partition.
++    reviewer2_baseline_only_outer_folds = True
++    baseline_only_outer_fold_variables = (
++        "Age", "Sex", "SmokingStatus", "BaselineFVC",
++        "Percent", "BaselineWeek", "FSS",
++    )
++
++    # Keep the v10 patient-count weight. All continuous baseline variables are
++    # standardized and equally weighted. Categorical blocks are one-hot encoded
++    # and block-normalized so Sex/SmokingStatus do not dominate by having more
++    # dummy columns. No future-derived quantity enters this objective.
++    baseline_only_balance_weight_patient_count = 1.5
++
++    # -----------------------------------------------------------------
+     # v10 FINAL-STABLE evaluation/reporting
+     # -----------------------------------------------------------------
+-    output_prefix = "recovery_v10_final_stable"
++    output_prefix = "reviewer2_v10_baseline_only_outerfold"
+ 
+     # IMPORTANT / enabled by default:
+     # Cluster bootstrap resamples PATIENTS, not visits, so repeated FVC rows
+@@ -1064,6 +1081,207 @@
+     return result
+ 
+ 
++def patient_baseline_only_balance_summary(records, cfg):
++    """
++    One row per strict-cohort patient for Reviewer-2 OUTER-fold sensitivity.
++
++    Only variables available at the prediction origin are candidates for fold
++    assignment. Future target count, future horizon, PatientSlope, and rapid
++    status are retained only as DESCRIPTIVE columns in the returned table so
++    that the resulting folds can be audited after assignment; they never enter
++    the balancing vector.
++    """
++    if len(records) == 0:
++        return pd.DataFrame()
++
++    p = (
++        records.groupby("Patient")
++        .agg(
++            Age=("Age", "first"),
++            Sex=("Sex", "first"),
++            SmokingStatus=("SmokingStatus", "first"),
++            BaselineFVC=("BaselineFVC", "first"),
++            Percent=("Percent", "first"),
++            BaselineWeek=("BaselineWeek", "first"),
++            FSS=("FSS", "first"),
++            # Descriptive-only audit columns below; NOT used for assignment.
++            NTargets=("TargetFVC", "size"),
++            PatientSlope=("PatientSlope", "first"),
++            MeanHorizon=("TargetWeekFromCT", "mean"),
++            MaxHorizon=("TargetWeekFromCT", "max"),
++        )
++        .reset_index()
++    )
++
++    # Descriptive-only rapid status for post-assignment fold profiles.
++    slope_q = float(
++        np.quantile(
++            p["PatientSlope"].to_numpy(dtype=np.float64),
++            cfg.balance_rapid_decline_quantile,
++        )
++    )
++    p["RapidDecliner"] = (
++        p["PatientSlope"].to_numpy(dtype=np.float64) <= slope_q
++    ).astype(float)
++    return p
++
++
++def make_baseline_only_outer_folds(records, n_splits, cfg, seed):
++    """
++    Deterministic Reviewer-2 sensitivity outer folds using baseline-only data.
++
++    Assignment vector contains ONLY:
++      patient count, Age, BaselineFVC, Percent, BaselineWeek, FSS,
++      Sex one-hot indicators, and SmokingStatus one-hot indicators.
++
++    No future outcome or future observation-schedule quantity contributes to
++    assignment. Fold capacities are fixed to differ by at most one patient.
++    """
++    p = patient_baseline_only_balance_summary(records, cfg)
++    n_patients = len(p)
++    if n_patients < n_splits:
++        raise RuntimeError(
++            f"Cannot make {n_splits} baseline-only folds from {n_patients} patients."
++        )
++
++    # -------------------------
++    # Continuous baseline data.
++    # -------------------------
++    numeric_cols = [
++        "Age", "BaselineFVC", "Percent", "BaselineWeek", "FSS",
++    ]
++    X_num = p[numeric_cols].copy()
++    for col in numeric_cols:
++        vals = pd.to_numeric(X_num[col], errors="coerce").to_numpy(dtype=np.float64)
++        finite = np.isfinite(vals)
++        med = float(np.nanmedian(vals[finite])) if np.any(finite) else 0.0
++        vals[~finite] = med
++        mu = float(np.mean(vals))
++        sd = float(np.std(vals, ddof=0))
++        if (not np.isfinite(sd)) or sd < 1e-8:
++            sd = 1.0
++        X_num[col] = (vals - mu) / sd
++
++    blocks = [X_num.to_numpy(dtype=np.float64)]
++
++    # -----------------------------------
++    # Baseline categorical characteristics.
++    # -----------------------------------
++    for col in ["Sex", "SmokingStatus"]:
++        cats = p[col].fillna("Unknown").astype(str)
++        D = pd.get_dummies(cats, prefix=col, dtype=float)
++        if D.shape[1] > 0:
++            arr = D.to_numpy(dtype=np.float64)
++            mu = np.mean(arr, axis=0)
++            sd = np.std(arr, axis=0, ddof=0)
++            sd = np.where(sd < 1e-8, 1.0, sd)
++            arr = (arr - mu) / sd
++            # Give each categorical VARIABLE approximately one unit of total
++            # influence regardless of the number of dummy columns.
++            arr = arr / np.sqrt(float(max(arr.shape[1], 1)))
++            blocks.append(arr)
++
++    baseline_Z = np.column_stack(blocks)
++
++    V = np.column_stack([
++        np.ones(n_patients, dtype=np.float64)
++        * float(cfg.baseline_only_balance_weight_patient_count),
++        baseline_Z,
++    ])
++
++    desired = np.sum(V, axis=0) / float(n_splits)
++    fold_sums = np.zeros((n_splits, V.shape[1]), dtype=np.float64)
++    fold_members = [[] for _ in range(n_splits)]
++
++    # Fixed capacities guarantee 5--6 patients/fold for 29 patients and five
++    # folds; more generally, sizes differ by at most one.
++    base = n_patients // n_splits
++    extra = n_patients % n_splits
++    capacities = np.array(
++        [base + (1 if f < extra else 0) for f in range(n_splits)],
++        dtype=int,
++    )
++
++    rng = np.random.default_rng(seed)
++    extremeness = np.linalg.norm(V[:, 1:], axis=1)
++    jitter = rng.uniform(0.0, 1e-6, size=n_patients)
++    order = np.argsort(-(extremeness + jitter))
++
++    # Seed every fold once.
++    for f, idx in enumerate(order[:n_splits]):
++        fold_members[f].append(int(idx))
++        fold_sums[f] += V[idx]
++
++    for idx in order[n_splits:]:
++        candidates = [
++            f for f in range(n_splits)
++            if len(fold_members[f]) < int(capacities[f])
++        ]
++        if not candidates:
++            raise RuntimeError("Baseline-only fold assignment exhausted capacities.")
++
++        costs = []
++        for f in candidates:
++            trial = fold_sums.copy()
++            trial[f] += V[idx]
++            imbalance = np.sum((trial - desired.reshape(1, -1)) ** 2)
++            costs.append((float(imbalance), f))
++
++        best_cost = min(c for c, _ in costs)
++        tied = [
++            f for c, f in costs
++            if np.isclose(c, best_cost, rtol=1e-10, atol=1e-10)
++        ]
++        best = min(tied, key=lambda f: len(fold_members[f]))
++        fold_members[best].append(int(idx))
++        fold_sums[best] += V[idx]
++
++    result = []
++    all_patients = set(p["Patient"].astype(str).tolist())
++    for f, member_idx in enumerate(fold_members):
++        val_patients = set(p.iloc[member_idx]["Patient"].astype(str).tolist())
++        train_patients = all_patients - val_patients
++        sub = p[p["Patient"].astype(str).isin(val_patients)].copy()
++
++        # NOTE: target count, slope, rapid status, and horizon below are
++        # DESCRIPTIVE AFTER assignment and had no influence on fold creation.
++        summary = {
++            "Fold": f + 1,
++            "Patients": int(len(sub)),
++            "Targets": int(sub["NTargets"].sum()),
++            "MeanAge": float(sub["Age"].mean()),
++            "MaleRate": float(np.mean(sub["Sex"].astype(str).str.lower() == "male")),
++            "MeanBaselineFVC": float(sub["BaselineFVC"].mean()),
++            "MeanPercent": float(sub["Percent"].mean()),
++            "MeanBaselineWeek": float(sub["BaselineWeek"].mean()),
++            "MeanFSS": float(sub["FSS"].mean()),
++            "MeanSlope_DESCRIPTIVE_ONLY": float(sub["PatientSlope"].mean()),
++            "RapidRate_DESCRIPTIVE_ONLY": float(sub["RapidDecliner"].mean()),
++            "MeanHorizon_DESCRIPTIVE_ONLY": float(
++                np.average(
++                    sub["MeanHorizon"],
++                    weights=np.maximum(sub["NTargets"], 1),
++                )
++            ),
++            "AssignmentUsedFutureInformation": False,
++        }
++        result.append({
++            "train_patients": train_patients,
++            "val_patients": val_patients,
++            "summary": summary,
++        })
++
++    # Defensive invariants for the sensitivity analysis.
++    assigned = set().union(*[x["val_patients"] for x in result])
++    if assigned != all_patients:
++        raise RuntimeError("Baseline-only outer folds did not cover all patients exactly once.")
++    counts = [len(x["val_patients"]) for x in result]
++    if max(counts) - min(counts) > 1:
++        raise RuntimeError(f"Unexpected fold-size spread: {counts}")
++
++    return result
++
++
+ def balanced_inner_split(train_records, cfg, seed, outer_fold):
+     """
+     Choose one balanced patient fold as inner validation.
+@@ -2389,27 +2607,50 @@
+             )
+ 
+     # -----------------------------------------------------------------
+-    # Patient-balanced outer folds.
++    # Reviewer-2 sensitivity: BASELINE-ONLY OUTER folds.
+     # -----------------------------------------------------------------
+-    outer_folds = make_balanced_patient_folds(
++    # IMPORTANT: this is the ONLY methodological change relative to frozen v10.
++    # Future-derived slope, rapid status, target count and horizon are not used
++    # to decide outer validation membership.
++    outer_folds = make_baseline_only_outer_folds(
+         all_records, cfg.n_folds, cfg, cfg.seed
+     )
+ 
+-    print("\nBALANCED OUTER-FOLD PATIENT PROFILES")
++    print("\nREVIEWER-2 BASELINE-ONLY OUTER-FOLD PATIENT PROFILES")
++    print(
++        "Assignment variables: Age, Sex, SmokingStatus, BaselineFVC, "
++        "Percent, BaselineWeek, FSS. "
++        "NO future-derived quantity used."
++    )
+     outer_profile = pd.DataFrame(
+         [f["summary"] for f in outer_folds]
+     )
+     print(
+         outer_profile.round({
++            "MeanAge": 1,
++            "MaleRate": 3,
+             "MeanBaselineFVC": 1,
+             "MeanPercent": 1,
+             "MeanBaselineWeek": 2,
+-            "MeanSlope": 2,
+-            "RapidRate": 3,
+-            "MeanHorizon": 1,
++            "MeanFSS": 3,
++            "MeanSlope_DESCRIPTIVE_ONLY": 2,
++            "RapidRate_DESCRIPTIVE_ONLY": 3,
++            "MeanHorizon_DESCRIPTIVE_ONLY": 1,
+         }).to_string(index=False)
+     )
+ 
++    # Save source-ID assignments locally for audit. Do NOT publish this file
++    # because OSIC pseudonymous IDs are redistribution-restricted.
++    outer_assignment_rows = []
++    for f_idx, fold_def in enumerate(outer_folds, start=1):
++        for pid in sorted(fold_def["val_patients"]):
++            outer_assignment_rows.append({
++                "Patient": str(pid),
++                "OuterFold": int(f_idx),
++                "AssignmentMode": "baseline_only",
++            })
++    outer_assignments = pd.DataFrame(outer_assignment_rows)
++
+     fold_rows = []
+     oof_parts = []
+ 
+@@ -2435,8 +2676,9 @@
+         bounds = training_prediction_bounds(train_records, cfg)
+         print(f"Broad physiological FVC sanity bounds: {bounds[0]:.0f} .. {bounds[1]:.0f} mL")
+ 
+-        # Balanced inner patient split for model selection, blending and
+-        # uncertainty calibration.
++        # ORIGINAL v10 outcome-balanced INNER patient split for development
++        # model selection, blending and uncertainty calibration. This is kept
++        # unchanged deliberately so the sensitivity isolates OUTER-fold design.
+         inner_train, inner_val, inner_profile = balanced_inner_split(
+             train_records,
+             cfg,
+@@ -2753,6 +2995,9 @@
+     excluded_path = f"/kaggle/working/{prefix}_strict_excluded_patients.csv"
+     dynamic_manifest_path = f"/kaggle/working/{prefix}_dynamic_followup_manifest.csv"
+     outer_profile_path = f"/kaggle/working/{prefix}_outer_fold_profiles.csv"
++    outer_assignment_path = (
++        f"/kaggle/working/{prefix}_outer_fold_assignments_LOCAL_DO_NOT_PUBLISH.csv"
++    )
+     per_patient_path = f"/kaggle/working/{prefix}_per_patient_oof_metrics.csv"
+     bootstrap_dist_path = f"/kaggle/working/{prefix}_patient_bootstrap_distribution.csv"
+     bootstrap_summary_path = f"/kaggle/working/{prefix}_patient_bootstrap_ci.csv"
+@@ -2766,6 +3011,7 @@
+     if cfg.build_dynamic_secondary_manifest:
+         dynamic_manifest.to_csv(dynamic_manifest_path, index=False)
+     outer_profile.to_csv(outer_profile_path, index=False)
++    outer_assignments.to_csv(outer_assignment_path, index=False)
+ 
+     if cfg.save_per_patient_metrics:
+         per_patient_metrics.to_csv(per_patient_path, index=False)
+@@ -2775,6 +3021,12 @@
+         bootstrap_summary.to_csv(bootstrap_summary_path, index=False)
+ 
+     pd.DataFrame([{
++        "SensitivityAnalysis": "Reviewer2_Comment2_BaselineOnlyOuterFolds",
++        "OuterFoldAssignmentUsedFutureInformation": False,
++        "OuterFoldAssignmentVariables": (
++            "Age|Sex|SmokingStatus|BaselineFVC|Percent|BaselineWeek|FSS"
++        ),
++        "InnerDevelopmentSplit": "Frozen_v10_unchanged",
+         "Strict_Eligible_Patients": strict_df["Patient"].nunique(),
+         "Strict_Excluded_Patients": (
+             excluded_patients["Patient"].nunique()
+@@ -2857,6 +3109,7 @@
+         f"  {excluded_path}\n"
+         f"  {dynamic_manifest_path}\n"
+         f"  {outer_profile_path}\n"
++        f"  {outer_assignment_path}  [LOCAL / DO NOT PUBLISH]\n"
+         f"  {per_patient_path}\n"
+         f"  {bootstrap_summary_path}\n"
+         f"  {bootstrap_dist_path}"    )
+@@ -3004,8 +3257,9 @@
+         )
+ 
+     print("\n" + "=" * 110)
+-    print("FINAL STABLE PRIMARY RUN")
+-    print("Frozen v9 predictor + strict CT protocol + balanced CV")
++    print("REVIEWER-2 COMMENT-2 SENSITIVITY RUN")
++    print("Frozen v10 model + strict CT protocol + BASELINE-ONLY OUTER folds")
++    print("Only outer-fold construction differs from submitted/frozen v10")
+     print("=" * 110)
+ 
+     results = run_recovery(config, df)
