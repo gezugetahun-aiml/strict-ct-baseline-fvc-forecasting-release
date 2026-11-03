@@ -1,8 +1,8 @@
 # Strict CT-Baseline Multimodal FVC Forecasting — Reproducibility Release
 
-**Archived v1.0.0 DOI:** https://doi.org/10.5281/zenodo.23911990
+**Current archived v1.1.0 DOI:** https://doi.org/10.5281/zenodo.23926713
 
-The current `main` branch includes the Reviewer-2 outer-fold sensitivity analysis prepared for **v1.1.0**.
+**Historical v1.0.0 DOI:** https://doi.org/10.5281/zenodo.23911990
 
 This repository is the **sanitized public reproducibility release** for the manuscript *Strict CT-Baseline Multimodal Learning for Future FVC Prediction in Pulmonary Fibrosis*.
 
