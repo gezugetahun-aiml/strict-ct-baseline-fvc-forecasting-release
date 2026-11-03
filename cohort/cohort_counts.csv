@@ -1,0 +1,6 @@
+Quantity,Value
+OSIC source patients,176
+Strict eligible patients,29
+Strict excluded patients,147
+Strict future targets,231
+Excluded: no FVC at or before CT,147
