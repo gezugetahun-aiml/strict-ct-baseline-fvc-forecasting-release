@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this code or reproducibility package, please cite the associated manuscript."
+title: "Strict CT-Baseline Multimodal Learning for Future FVC Prediction in Pulmonary Fibrosis"
+type: software
+version: 1.0.0
+date-released: 2026-11-03
+authors:
+  - family-names: Nigus
+    given-names: "Getahun G."
+  - family-names: Ibenthal
+    given-names: Achim
+  - family-names: Abebe
+    given-names: Mesfin
+  - family-names: Ouaddou
+    given-names: Othmane
+license: MIT
