@@ -16,7 +16,7 @@ The `PF###` labels are one-time random release labels with no algorithmic relati
 
 ## What is released
 
-- the frozen final-v10 model source;
+- the frozen final model source;
 - the exact strict CT-baseline eligibility and patient-balanced fold construction code;
 - an anonymous 29-patient release manifest with fold and target-count information only;
 - aggregate fold summaries;
