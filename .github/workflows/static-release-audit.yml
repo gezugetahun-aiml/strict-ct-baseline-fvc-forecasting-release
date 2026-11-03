@@ -7,23 +7,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - run: pip install pandas numpy
-      - name: Fail if OSIC-style pseudonymous IDs appear
+
+      - name: Fail if protected OSIC-style identifiers occur in Git history
+        shell: bash
         run: |
-          if grep -R -E 'ID[0-9]{20,}' . --exclude-dir=.git; then
-            echo 'Protected OSIC-style identifier found in public release.'
+          if git grep -n -E 'ID[0-9]{20,}' $(git rev-list --all); then
+            echo 'Protected OSIC-style identifier found in repository history.'
             exit 1
           fi
+
+      - name: Fail if prohibited source-derived files occur in history
+        shell: bash
+        run: |
+          if git log --all --name-only --pretty=format: | grep -E '(^|/)(submitted_oof_predictions\.csv|PRIVATE_osic.*|.*\.dcm)$'; then
+            echo 'Prohibited source-derived file found in repository history.'
+            exit 1
+          fi
+
       - name: Verify anonymous manifest counts
         run: |
           python - <<'PY'
           import pandas as pd
-          x=pd.read_csv('cohort/release_patient_manifest.csv')
-          assert len(x)==29 and x.ReleasePatientID.nunique()==29
-          assert x.NFutureTargets.sum()==231
+          x = pd.read_csv('cohort/release_patient_manifest.csv')
+          assert len(x) == 29
+          assert x.ReleasePatientID.nunique() == 29
+          assert x.NFutureTargets.sum() == 231
           assert x.ReleasePatientID.str.fullmatch(r'PF\d{3}').all()
-          print('PASS: anonymous manifest')
+          print('PASS: anonymous manifest has 29 unique release IDs and 231 targets.')
           PY
+
+      - name: Run release audit script
+        run: python analysis/audit_public_release.py
