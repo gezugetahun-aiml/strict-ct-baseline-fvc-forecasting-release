@@ -1,0 +1,29 @@
+name: static-release-audit
+
+on: [push, pull_request]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install pandas numpy
+      - name: Fail if OSIC-style pseudonymous IDs appear
+        run: |
+          if grep -R -E 'ID[0-9]{20,}' . --exclude-dir=.git; then
+            echo 'Protected OSIC-style identifier found in public release.'
+            exit 1
+          fi
+      - name: Verify anonymous manifest counts
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          x=pd.read_csv('cohort/release_patient_manifest.csv')
+          assert len(x)==29 and x.ReleasePatientID.nunique()==29
+          assert x.NFutureTargets.sum()==231
+          assert x.ReleasePatientID.str.fullmatch(r'PF\d{3}').all()
+          print('PASS: anonymous manifest')
+          PY
