@@ -2,8 +2,7 @@ cff-version: 1.2.0
 message: "If you use this code or reproducibility package, please cite the associated manuscript and this archived software release."
 title: "Strict CT-Baseline Multimodal Learning for Future FVC Prediction in Pulmonary Fibrosis"
 type: software
-version: 1.0.0
-doi: "10.5281/zenodo.23911990"
+version: 1.1.0
 date-released: 2026-11-03
 authors:
   - family-names: Nigus
