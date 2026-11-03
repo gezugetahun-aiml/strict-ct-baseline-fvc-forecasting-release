@@ -1,29 +1,41 @@
-# v1.0.0 release notes
+# v1.1.0 release notes
 
-This is the first sanitized reproducibility release associated with the manuscript *Strict CT-Baseline Multimodal Learning for Future FVC Prediction in Pulmonary Fibrosis*.
+This release extends the sanitized reproducibility package for the manuscript *Strict CT-Baseline Multimodal Learning for Future FVC Prediction in Pulmonary Fibrosis* with reviewer-requested sensitivity analyses.
 
-## Included
+## New in v1.1.0
 
-- frozen final-v10 model source;
-- strict CT-baseline eligibility and deterministic five-fold reconstruction code;
-- anonymous cohort-structure manifest using one-time `PF###` release labels;
-- aggregate fold and primary-performance summaries;
-- reviewer-requested persistence/oracle and catastrophic-failure aggregate diagnostics;
-- standardized bootstrap ablation summaries;
-- scripts for authorized OSIC users to regenerate source-level cohort/fold assignments and local OOF analyses.
+- Reviewer 2 Comment 2 baseline-only outer-fold sensitivity analysis.
+- Exact unified patch against frozen v10 changing only the outer patient-fold construction.
+- Paired local comparison script for submitted-v10 versus sensitivity OOF predictions.
+- Aggregate sensitivity summary, fold-level results, fold profiles, and patient-cluster bootstrap confidence intervals.
+- Expanded privacy audit blocking row-level OOF, patient-level change, local source-ID fold-assignment, and related source-derived files from public Git history.
 
-## Deliberately excluded
+## Reviewer 2 sensitivity design
 
-- original OSIC clinical CSVs and DICOM images;
-- OSIC pseudonymous patient identifiers;
-- any source-ID crosswalk;
-- submitted row-level OOF predictions;
-- per-patient source-derived clinical trajectories.
+Outer-fold assignment uses prediction-origin variables only: Age, Sex, SmokingStatus, baseline FVC, Percent, baseline week, CT-derived FSS, and patient-count balancing.
 
-## Reference aggregate results
+It does not use forward PatientSlope, rapid-decliner status, future-target count, future horizon, future FVC/Delta-FVC, or held-out prediction error.
 
-Strict cohort: 29 patients / 231 future targets.
+Everything else in frozen v10 remains unchanged.
 
-Final ensemble: MAE 169.416 mL; RMSE 243.886 mL; modified LLL -6.954222.
+## Aggregate sensitivity result
+
+Same strict cohort: 29 patients / 231 future targets.
+
+- Submitted v10 MAE: 169.416 mL
+- Baseline-only outer-fold MAE: 198.402 mL
+- Paired Delta MAE: +28.986 mL, 95% CI 1.306 to 57.002 mL
+- Submitted v10 RMSE: 243.886 mL
+- Sensitivity RMSE: 267.997 mL
+- Paired Delta RMSE: +24.111 mL, 95% CI -3.619 to 50.666 mL
+- Submitted v10 LLL: -6.954222
+- Sensitivity LLL: -7.053661
+- Absolute errors >=500 mL: 14 versus 18
+
+The sensitivity supports a more cautious interpretation: estimated MAE is materially affected by outer-fold composition in this small cohort, and both estimates remain exploratory pending external validation.
+
+## Privacy boundary
+
+This release does not contain original OSIC records, DICOM images, OSIC pseudonymous identifiers, source-ID crosswalks, row-level OOF predictions, patient-level change tables, or local source-ID fold assignments.
 
 This software release is for research reproducibility and is not a clinical decision-support system.
