@@ -1,68 +1,75 @@
-# Strict CT-Baseline Multimodal FVC Forecasting — Public Reproducibility Release
+# Strict CT-Baseline Multimodal FVC Forecasting — Reproducibility Release
 
-This is the **sanitized public-release package** for the manuscript *Strict CT-Baseline Multimodal Learning for Future FVC Prediction in Pulmonary Fibrosis*.
+This repository is the **sanitized public reproducibility release** for the manuscript *Strict CT-Baseline Multimodal Learning for Future FVC Prediction in Pulmonary Fibrosis*.
 
-## Privacy and OSIC data-use compliance
+## Data-use and privacy boundary
 
-The public release does **not** contain:
+The release does **not** contain:
 
 - original OSIC clinical CSV files or DICOM images;
 - OSIC pseudonymous patient identifiers;
-- any mapping between OSIC identifiers and the study-specific `PF###` release labels;
+- any source-ID-to-release-ID crosswalk;
 - row-level OOF target/prediction files containing source-derived patient trajectories;
 - per-patient clinical measurements that could facilitate linkage back to the source dataset.
 
-The `PF###` labels are one-time random release labels with no algorithmic relationship to OSIC identifiers. The mapping is not distributed.
+The `PF###` labels are one-time study-specific anonymous release labels. They are not hashes, are not derived from OSIC identifiers or clinical values, and are not intended to identify which source patient corresponds to a particular release label.
 
 ## What is released
 
-- the frozen final model source;
-- the exact strict CT-baseline eligibility and patient-balanced fold construction code;
-- an anonymous 29-patient release manifest with fold and target-count information only;
-- aggregate fold summaries;
-- aggregate primary, oracle/persistence, catastrophic-failure, and audited ablation results;
-- scripts that authorized OSIC users can run locally to reconstruct the strict cohort, folds, OOF metrics, reviewer oracle analysis, catastrophic-error table, and clinical-temporal Ridge baseline.
+- the frozen final-v10 model source;
+- executable code implementing the strict CT-baseline eligibility rule;
+- executable code implementing the deterministic patient-balanced five-fold construction used in the manuscript;
+- an anonymous cohort-structure manifest containing release label, fold, and number of future targets only;
+- aggregate fold summaries and aggregate manuscript/reviewer results;
+- scripts that authorized OSIC users can run locally to reconstruct the exact source-ID strict cohort, exclusions, future targets, outer folds, OOF metrics, reviewer oracle analysis, catastrophic-error table, and clinical-temporal Ridge baseline.
 
-## Manuscript reference results
+## Reproducibility workflow
 
-- source cohort: 176 patients;
-- strict cohort: 29 patients;
-- strict future targets: 231;
-- MAE: 169.416 mL;
-- RMSE: 243.886 mL;
-- modified Laplace log-likelihood: -6.954222;
-- mean predicted uncertainty: 196.857 mL;
-- 14 predictions had absolute error >=500 mL.
-
-Reviewer-requested diagnostics:
-
-- persistence MAE/RMSE: 210.100 / 293.985 mL;
-- retrospective oracle-best-expert MAE/RMSE: 99.029 / 182.002 mL;
-- all 14 catastrophic targets lay outside the seven-expert prediction range;
-- 10/14 remained >=500 mL even under retrospective oracle selection.
-
-## Reconstructing the strict cohort and folds
-
-Obtain an authorized local copy of the OSIC `train.csv`, then run:
+Researchers with authorized access to the OSIC Pulmonary Fibrosis Progression dataset should obtain the original `train.csv` and DICOM data from the authorized source. Then run:
 
 ```bash
 python analysis/rebuild_strict_cohort_and_folds.py --train-csv /path/to/train.csv
 ```
 
-For the manuscript dataset this should report 176 source patients, 29 strict eligible patients, 147 excluded patients, and 231 future targets. The locally generated files retain source identifiers and are written under `local_outputs/`, which is excluded from Git.
+For the manuscript dataset, the script should reproduce:
+
+- 176 source patients;
+- 29 strict eligible patients;
+- 147 excluded patients;
+- 231 strictly post-CT future targets;
+- the deterministic five outer folds used in the manuscript.
+
+The locally regenerated files retain the original source identifiers and are written under `local_outputs/`, which is excluded from Git.
+
+The anonymous `PF###` manifest is therefore a public description of cohort/fold structure, not a crosswalk to the source data. Exact source-level verification is performed locally by rerunning the supplied eligibility and fold-construction code on an authorized OSIC copy.
+
+## Manuscript reference results
+
+- MAE: **169.416 mL**
+- RMSE: **243.886 mL**
+- modified Laplace log-likelihood: **-6.954222**
+- mean predicted uncertainty: **196.857 mL**
+- predictions with absolute error >=500 mL: **14**
+
+Reviewer-requested diagnostics:
+
+- persistence MAE/RMSE: **210.100 / 293.985 mL**
+- retrospective oracle-best-expert MAE/RMSE: **99.029 / 182.002 mL**
+- catastrophic targets outside the seven-expert prediction range: **14/14**
+- catastrophic cases remaining >=500 mL under retrospective oracle selection: **10/14**
 
 ## Recomputing prediction metrics
 
-Run the frozen model on your authorized OSIC copy to generate an OOF file, then:
+After generating local OOF predictions with the frozen model:
 
 ```bash
 python analysis/analyze_local_oof.py --oof local_outputs/your_oof.csv
 python analysis/make_catastrophic_expert_range_table.py --oof local_outputs/your_oof.csv
 ```
 
-## Important reproducibility note
+## Availability boundary
 
-The public repository intentionally does not ship the submitted 231-row OOF file because exact row-level source-derived trajectories can remain linkable even after replacing direct identifiers. Aggregate reference values are provided so an authorized user can check the locally regenerated output.
+The 231-row submitted OOF file is intentionally not distributed because exact row-level source-derived trajectories can remain linkable even after direct identifiers are removed. Aggregate reference values are provided so authorized users can verify their locally regenerated outputs.
 
 ## Clinical-use disclaimer
 
