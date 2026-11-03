@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this code or reproducibility package, please cite the associated manuscript."
+message: "If you use this code or reproducibility package, please cite the associated manuscript and this archived software release."
 title: "Strict CT-Baseline Multimodal Learning for Future FVC Prediction in Pulmonary Fibrosis"
 type: software
 version: 1.0.0
@@ -13,4 +13,14 @@ authors:
     given-names: Mesfin
   - family-names: Ouaddou
     given-names: Othmane
+repository-code: "https://github.com/gezugetahun-aiml/strict-ct-fvc-forecasting-release"
+url: "https://github.com/gezugetahun-aiml/strict-ct-fvc-forecasting-release"
+abstract: "Sanitized reproducibility release for strict CT-baseline multimodal future-FVC forecasting in pulmonary fibrosis using the OSIC dataset. Source OSIC records and pseudonymous patient identifiers are not redistributed."
+keywords:
+  - pulmonary fibrosis
+  - forced vital capacity
+  - FVC forecasting
+  - multimodal learning
+  - reproducibility
+  - OSIC
 license: MIT
