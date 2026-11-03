@@ -27,10 +27,10 @@ jobs:
             exit 1
           fi
 
-      - name: Fail if prohibited source-derived files occur in history
+      - name: Fail if prohibited source-derived files occur in Git history
         shell: bash
         run: |
-          if git log --all --name-only --pretty=format: | grep -E '(^|/)(submitted_oof_predictions\.csv|PRIVATE_osic.*|.*\.dcm)$'; then
+          if git log --all --name-only --pretty=format: | grep -Ei '(^|/)(submitted_oof_predictions\.csv|.*_oof_predictions\.csv|.*_patient_changes\.csv|.*_outer_fold_assignments_LOCAL_DO_NOT_PUBLISH\.csv|.*_per_patient_oof_metrics\.csv|.*_strict_excluded_patients\.csv|.*_dynamic_followup_manifest\.csv|PRIVATE_osic.*|.*\.dcm)$'; then
             echo 'Prohibited source-derived file found in repository history.'
             exit 1
           fi
