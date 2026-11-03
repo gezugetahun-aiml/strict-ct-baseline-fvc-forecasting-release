@@ -12,8 +12,6 @@ authors:
     given-names: Achim
   - family-names: Abebe
     given-names: Mesfin
-  - family-names: Ouaddou
-    given-names: Othmane
 repository-code: "https://github.com/gezugetahun-aiml/strict-ct-fvc-forecasting-release"
 url: "https://github.com/gezugetahun-aiml/strict-ct-fvc-forecasting-release"
 abstract: "Sanitized reproducibility release for strict CT-baseline multimodal future-FVC forecasting in pulmonary fibrosis using the OSIC dataset. Source OSIC records and pseudonymous patient identifiers are not redistributed."
