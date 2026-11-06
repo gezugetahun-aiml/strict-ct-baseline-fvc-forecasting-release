@@ -20,7 +20,7 @@ The `PF###` labels are one-time study-specific anonymous release labels. They ar
 
 ## What is released
 
-- the frozen final-v10 model source;
+- the frozen final model source;
 - executable code implementing the strict CT-baseline eligibility rule;
 - executable code implementing the deterministic patient-balanced five-fold construction used in the manuscript;
 - an anonymous cohort-structure manifest containing release label, fold, and number of future targets only;
